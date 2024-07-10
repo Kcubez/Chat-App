@@ -1,8 +1,7 @@
-// server.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const aws = require('aws-sdk');
+const { S3Client } = require('@aws-sdk/client-s3');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
@@ -10,51 +9,71 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+// Initialize S3 client
+const s3Client = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+});
+
+// Initialize Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// AWS S3 Configuration
-const s3 = new aws.S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION,
-});
-
+// Configure multer for file uploads to S3
 const upload = multer({
     storage: multerS3({
-        s3: s3,
+        s3: s3Client,
         bucket: process.env.S3_BUCKET_NAME,
-        acl: 'public-read',
         key: function (req, file, cb) {
             cb(null, Date.now().toString() + path.extname(file.originalname));
         },
+        contentType: multerS3.AUTO_CONTENT_TYPE,
     }),
 });
 
-// Serve static files
+// Serve static files from the 'public' directory
 app.use(express.static('public'));
 
 // API endpoint for image uploads
 app.post('/upload', upload.single('image'), (req, res) => {
-    res.send({ imageUrl: req.file.location });
+    if (req.file) {
+        res.json({ imageUrl: req.file.location });
+    } else {
+        res.status(400).json({ error: 'No file uploaded' });
+    }
 });
 
+// Store user nicknames
+let nicknames = {};
+
+// Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log('a user connected');
-    socket.on('chat message', (msg) => {
-        io.emit('chat message', msg);
+
+    // Handle setting nickname
+    socket.on('set nickname', (nickname) => {
+        nicknames[socket.id] = nickname;
     });
 
-    socket.on('image message', (imageUrl) => {
-        io.emit('image message', imageUrl);
+    socket.on('chat message', (msg) => {
+        io.emit('chat message', { nickname: nicknames[socket.id], message: msg });
+    });
+
+    socket.on('image message', (data) => {
+        io.emit('image message', { nickname: nicknames[socket.id], imageUrl: data.imageUrl });
     });
 
     socket.on('disconnect', () => {
         console.log('user disconnected');
+        delete nicknames[socket.id];
     });
 });
 
+// Start the server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

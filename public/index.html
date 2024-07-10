@@ -116,62 +116,99 @@
         <div id="header">Chat App</div>
         <ul id="messages"></ul>
         <div id="form-container">
-            <form id="imageForm" action="/upload" method="post" enctype="multipart/form-data">
+            <form id="imageForm" enctype="multipart/form-data">
                 <label for="imageInput">+</label>
-                <input type="file" name="image" id="imageInput" />
+                <input type="file" name="image" id="imageInput" accept="image/*" />
             </form>
             <form id="form" action="">
-                <input id="input" autocomplete="off" placeholder="Type a message..." /><button>Send</button>
+                <input id="input" autocomplete="off" placeholder="Type a message..." />
+                <button>Send</button>
             </form>
         </div>
     </div>
-    <script src="/socket.io/socket.io.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
     <script>
         var socket = io();
+
+        // Request and set nickname on connection
+        var nickname = prompt("Please enter your nickname:");
+        socket.emit('set nickname', nickname);
+
         var form = document.getElementById('form');
         var input = document.getElementById('input');
 
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            if (input.value) {
+            if (input.value.trim()) {
                 socket.emit('chat message', input.value);
                 input.value = '';
             }
         });
 
-        socket.on('chat message', function(msg) {
-            var item = document.createElement('li');
-            item.textContent = msg;
-            document.getElementById('messages').appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
+        socket.on('chat message', function(data) {
+            appendMessage(data.nickname, data.message);
         });
 
-        socket.on('image message', function(imageUrl) {
+        socket.on('image message', function(data) {
+            appendImage(data.nickname, data.imageUrl);
+        });
+
+        function appendMessage(nickname, message) {
+            var item = document.createElement('li');
+            item.textContent = `${nickname}: ${message}`;
+            document.getElementById('messages').appendChild(item);
+            scrollToBottom();
+        }
+
+        function appendImage(nickname, imageUrl) {
             var item = document.createElement('li');
             var img = document.createElement('img');
             img.src = imageUrl;
+            img.style.maxWidth = '100%';
+            item.textContent = `${nickname}: `;
             item.appendChild(img);
             document.getElementById('messages').appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        });
+            scrollToBottom();
+        }
 
-        var imageForm = document.getElementById('imageForm');
-        imageForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            var formData = new FormData(imageForm);
+        function scrollToBottom() {
+            var messagesContainer = document.getElementById('messages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        var imageInput = document.getElementById('imageInput');
+        imageInput.addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+
+            var formData = new FormData();
+            formData.append('image', file);
+
             fetch('/upload', {
                 method: 'POST',
                 body: formData
-            }).then(response => response.json())
-              .then(data => {
-                  socket.emit('image message', data.imageUrl);
-              });
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.imageUrl) {
+                    socket.emit('image message', { imageUrl: data.imageUrl });
+                } else {
+                    console.error('Image upload failed: No URL returned');
+                }
+            })
+            .catch(error => {
+                console.error('Error uploading image:', error);
+            });
         });
 
-        var imageInput = document.getElementById('imageInput');
-        var label = document.querySelector('#imageForm label');
-        label.addEventListener('click', function() {
-            imageInput.click();
+        // Add error handling for socket connection
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log('Disconnected:', reason);
         });
     </script>
 </body>
