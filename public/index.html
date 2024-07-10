@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat App</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f4f4f4;
+            height: 100vh;
+        }
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            height: 90%;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        #header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2em;
+        }
+        #messages {
+            list-style-type: none;
+            padding: 20px;
+            margin: 0;
+            flex: 1;
+            overflow-y: scroll;
+            background-color: #fafafa;
+        }
+        #messages li {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: #f1f1f1;
+        }
+        #messages li:nth-child(odd) {
+            background-color: #e9e9e9;
+        }
+        #messages li img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+        #form-container {
+            display: flex;
+            padding: 10px;
+            background-color: #eee;
+            border-top: 1px solid #ddd;
+        }
+        #form {
+            display: flex;
+            flex: 1;
+            margin-left: 10px;
+        }
+        #input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        #input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            background-color: #0056b3;
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        #imageForm {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+        }
+        #imageForm input {
+            display: none;
+        }
+        #imageForm label {
+            padding: 0;
+            background-color: transparent;
+            border: none;
+            font-size: 2em;
+            color: #007bff;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        #imageForm label:hover {
+            color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="header">Chat App</div>
+        <ul id="messages"></ul>
+        <div id="form-container">
+            <form id="imageForm" action="/upload" method="post" enctype="multipart/form-data">
+                <label for="imageInput">+</label>
+                <input type="file" name="image" id="imageInput" />
+            </form>
+            <form id="form" action="">
+                <input id="input" autocomplete="off" placeholder="Type a message..." /><button>Send</button>
+            </form>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var socket = io();
+        var form = document.getElementById('form');
+        var input = document.getElementById('input');
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (input.value) {
+                socket.emit('chat message', input.value);
+                input.value = '';
+            }
+        });
+
+        socket.on('chat message', function(msg) {
+            var item = document.createElement('li');
+            item.textContent = msg;
+            document.getElementById('messages').appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        socket.on('image message', function(imageUrl) {
+            var item = document.createElement('li');
+            var img = document.createElement('img');
+            img.src = imageUrl;
+            item.appendChild(img);
+            document.getElementById('messages').appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        var imageForm = document.getElementById('imageForm');
+        imageForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(imageForm);
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  socket.emit('image message', data.imageUrl);
+              });
+        });
+
+        var imageInput = document.getElementById('imageInput');
+        var label = document.querySelector('#imageForm label');
+        label.addEventListener('click', function() {
+            imageInput.click();
+        });
+    </script>
+</body>
+</html>
