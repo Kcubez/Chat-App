@@ -158,13 +158,27 @@ If prompted, type `yes` and press Enter.
     node server.js
     ```
 
-## Accessing the Application
+## Usage
 
 - Open your browser and navigate to:
 
 - ```(http://ec2-public-ip:3000)```
 - Enter a nickname to join the chat.
 - You should now be able to send text messages and upload images.
+
+## Project Structure
+```
+chat-app/
+│
+├── public/
+│   ├── index.html
+│
+├── server.js
+├── .env
+├── package.json
+├── package-lock.json
+└── README.md
+```
 
 ## Conclusion
 By following the above steps, you will set up a real-time chat application with text and image message support, hosted on Amazon S3 and an EC2 instance. If you encounter any issues or have further questions, feel free to open an issue or contact to kcubez21@gmail.com.
